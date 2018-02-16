@@ -1,0 +1,2 @@
+DEFINE DesignLib ../DesignLib
+ASSIGN DesignLib libMode shared
