@@ -12,6 +12,14 @@ using namespace oa;
 using namespace std;
 
 static oaNativeNS ns;
+#define MICRON 2000;
+
+int PinLayer;
+int MinRoutingLayer;
+int MaxRoutingLayer;
+float PinMoveStep;
+float MinPinPitch;
+float MaxPinPerturbation;
 
 /*
  * 
@@ -24,8 +32,8 @@ int main(int argc, char *argv[])
     cout << "UCLA EE 201A Winter 2017 Course Project" << endl;
     cout << endl;
     cout << "<YOUR TEAM NUMBER HERE>" << endl;
-    cout << "<YOUR NAMES HERE>" << endl;
-    cout << "<YOUR STUDENT IDS HERE>" << endl;
+    cout << "Yizhang Wu" << endl;
+    cout << "604279793" << endl;
     cout << "=================================================" << endl << endl;
    
     //Usage
@@ -62,14 +70,34 @@ int main(int argc, char *argv[])
     // All pin assignment code should be handled here
 	// The scratch code below covers basic traversal and some useful functions provided
 	// You are free to edit everything in this section (marked by ==)
+    PinLayer = inputRules.getPinLayer();
+    MinRoutingLayer = inputRules.getMinRoutingLayer();
+    MaxRoutingLayer = inputRules.getMaxRoutingLayer();
+    PinMoveStep = inputRules.getPinMoveStep();
+    MinPinPitch = inputRules.getMinPinPitch();
+    MaxPinPerturbation = inputRules.getMaxPinPerturbation();
 
-	oaString netName, instName, masterCellName, assocTermName, termName;
+    vector<oaInst*> allInsts;
+    int allInstCount = OAHelper::getAllInsts(design, allInsts);
+    //OAHelper::setInstOrient(allInsts[0], 90);
+    oaString oriName;
+    oaOrient tmpOri;
+
+    //OAHelper::setInstOrient(allInsts[0], 180);
+    tmpOri = allInsts[0]->getOrient();
+    oriName = tmpOri.getName();
+    cout << "Orientation: " << oriName << endl;
+
+	oaString netName, instName, masterCellName, assocTermName, termName, instTermName;
 	oaIter<oaNet> netIterator(block->getNets());
+
+
 	while (oaNet* net = netIterator.getNext()) {
+		//This net is the net in the top block, from PI/PO of the chip to macro
 		net->getName(ns, netName);
 		oaIter<oaInstTerm> instTermIterator(net->getInstTerms());
 		oaIter<oaTerm> termIterator(net->getTerms());
-		
+		cout << netName << endl;
 		//InstTerms
 		while (oaInstTerm* instTerm = instTermIterator.getNext()) {
 			instTerm->getTermName(ns, assocTermName);
@@ -78,7 +106,18 @@ int main(int argc, char *argv[])
 			oaInst* inst = instTerm->getInst();
 			inst->getName(ns, instName);
 			inst->getCellName(ns, masterCellName);
-
+			instTerm->getTermName(ns, instTermName);
+			/*
+			string instTermName_s;
+			instTermName_s = instTermName;
+			string tmpName = "d[0]";
+			if (instTermName_s == tmpName){
+				oaPoint offset = oaPoint(0, -100000);
+				OAHelper::MovePinByOffset(instTerm, offset);
+			}
+			*/
+			cout << "\t" << instName << " " << masterCellName << " " << instTermName << endl;
+			cout << "\t\tAssociated Term: " << assocTermName << endl;
 			// Use either of the 2 functions below to move macro pins
 			// Both samples move the instTerm 100 DBUs in the x direction on the global design
 			
@@ -94,6 +133,7 @@ int main(int argc, char *argv[])
 		//Terms
 		while (oaTerm* term = termIterator.getNext()) {
 			term->getName(ns,termName);
+			cout << "\t"<< termName << endl;
 			oaPoint termPos = OAHelper::GetTermPosition(term);
 		}
 	}

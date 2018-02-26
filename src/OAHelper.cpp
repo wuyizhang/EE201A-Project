@@ -15,6 +15,7 @@ OAHelper::~OAHelper()
 
 /* Function returns position of an oaTerm as an oaPoint
  * oaTerm -> oaPin -> oaPinFig -> oaBox -> getCenter()
+ * Position relative to origin of Instance
  */
 oaPoint OAHelper::GetTermPosition(oaTerm* term)
 {
@@ -35,6 +36,7 @@ oaPoint OAHelper::GetTermPosition(oaTerm* term)
 oaPoint OAHelper::GetAbsoluteInstTermPosition(oaInstTerm* instTerm)
 {
 	//Get relative position of associated terminal inside the instance master
+	//Not the term of the whole chip
 	oaTerm* assocTerm = instTerm->getTerm();
 	oaPoint relativePos = GetTermPosition(assocTerm);
     
@@ -107,4 +109,114 @@ void OAHelper::MovePinByOffset(oaInstTerm* instTerm, oaPoint offset)
 	oaPinFig* pinFig = pinFigIterator.getNext();
 
 	pinFig->move(trans2);
+}
+
+// Get the HPWL of a net
+int OAHelper::getNetHPWL(oaNet* net){
+	vector<oaTerm*> term_v;
+	vector<oaInstTerm*> instTerm_v;
+	vector<oaPoint> coord_v;
+	getEndPoints(net, term_v, instTerm_v, coord_v);
+	return getBoxHP(coord_v);
+}
+
+// Given a vector of oaPoint, find the smallest bonding 
+// box that enclose all the points and return the HPWL
+int OAHelper::getBoxHP(vector<oaPoint> &endPoint_v){ 
+	int max_x = 0;
+	int max_y = 0;
+	int min_x = 0;
+	int min_y = 0;
+	for( int i = 0; i < endPoint_v.size() ; i++){
+		max_x = (endPoint_v[i].x() > max_x) ? endPoint_v[i].x() : max_x;
+		max_y = (endPoint_v[i].y() > max_y) ? endPoint_v[i].y() : max_y;
+		if ( i != 0 ){
+			min_x = (endPoint_v[i].x() < min_x) ? endPoint_v[i].x() : min_x;
+			min_y = (endPoint_v[i].y() < min_y) ? endPoint_v[i].y() : min_y;
+		}
+		else{
+			min_x = endPoint_v[i].x();
+			min_y = endPoint_v[i].y();
+		}
+		
+	}
+	return max_x - min_x + max_y - min_y;
+}
+
+// Get all the end points of a net, including term and instTerm
+// Store oaTerm and oaInstTerm in two vectors
+// Return total number of endpoints
+int OAHelper::getEndPoints(oaNet* p_net, vector<oaTerm*> &term_v, vector<oaInstTerm*> &instTerm_v, vector<oaPoint> &coord_v){
+	int count = 0;
+	oaIter<oaTerm> termIterator(p_net->getTerms());
+	while (oaTerm *term = termIterator.getNext()){
+		term_v.push_back(term);
+		//Get the origin of term
+		oaPoint tmpPoint;
+		oaIter<oaPin> pinIterator(term->getPins());
+        oaPin *termPin = pinIterator.getNext();    
+        oaIter<oaPinFig> pinFigIterator(termPin->getFigs());
+        oaPinFig *termPinFig = pinFigIterator.getNext();
+        oaBox termPinBox;
+        termPinFig->getBBox(termPinBox);
+        termPinBox.getCenter(tmpPoint);
+        coord_v.push_back(tmpPoint);
+		count++;
+	}
+	oaIter<oaInstTerm> instTermIterator(p_net->getInstTerms());
+	while (oaInstTerm *instTerm = instTermIterator.getNext()){
+		instTerm_v.push_back(instTerm);
+		//Get the origin of inst
+		oaPoint tmpPoint;
+		oaInst *inst = instTerm->getInst();
+        inst->getOrigin(tmpPoint);
+        coord_v.push_back(tmpPoint);
+		count++;
+	}
+	return count;
+}
+
+// Set the orient of an instance while keeping the center of the instance 
+// rotate the instance counterclockwisly by specified degree
+void OAHelper::setInstOrient(oaInst* inst, int degree){
+	oaOrient ori;
+	oaPoint oldCenter;
+	oaPoint newCenter;
+	oaPoint origin;
+	oaBox instBox;
+	inst->getBBox(instBox);
+	instBox.getCenter(oldCenter);
+	if ( degree == 0 )
+		return;
+	if ( degree == 90){
+		ori = oaOrient(oacR90);
+		inst->setOrient(ori);
+	}else if ( degree == 180){
+		ori = oaOrient(oacR180);
+		inst->setOrient(ori);
+	}else if ( degree == 270){
+		ori = oaOrient(oacR270);
+		inst->setOrient(ori);
+	}else{
+		printf("Invalid orientation, instance not rotated\n");
+		return;
+	}
+	inst->getBBox(instBox);
+	instBox.getCenter(newCenter);
+	oaPoint offset = oldCenter - newCenter;
+	inst->getOrigin(origin);
+	origin += offset;
+	inst->setOrigin(origin);
+	return;
+}
+
+// Store all oaInst in inst_v, return the number of instances
+int OAHelper::getAllInsts(oaDesign *design, vector<oaInst*> &inst_v){
+	oaBlock *block = design->getTopBlock();
+	oaIter<oaInst> instIterator(block->getInsts());
+	oaBox instBox;
+	while (oaInst *curInst = instIterator.getNext()){
+		inst_v.push_back(curInst);
+	}
+	return inst_v.size();
 }
